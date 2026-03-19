@@ -9,7 +9,7 @@ const USER_RATE_LIMITS: Record<Role, number> = {
   admin: 60,
   engineer: 30,
   manager: 20,
-  viewer: 10,
+  viewer: 30,
   intern: 10,
 };
 
