@@ -4,7 +4,6 @@ interface RateLimitEntry {
   timestamps: number[];
 }
 
-// Per-user limits (requests per minute)
 const USER_RATE_LIMITS: Record<Role, number> = {
   admin: 60,
   engineer: 30,
@@ -13,7 +12,6 @@ const USER_RATE_LIMITS: Record<Role, number> = {
   intern: 10,
 };
 
-// Per-tool limits (calls per minute)
 const TOOL_RATE_LIMITS: Record<string, number> = {
   read_file: 5,
   db_query: 10,
@@ -35,23 +33,25 @@ const TOOL_RATE_LIMITS: Record<string, number> = {
   list_memory: 10,
   search_web: 10,
   process_uploaded_file: 10,
+  create_invoice: 5,
+  process_payment: 3,
+  transfer_funds: 3,
+  generate_report: 10,
+  delegate_to_agent: 10,
 };
 
-const WINDOW_MS = 60_000; // 1 minute
+const WINDOW_MS = 60_000;
 
-// In-memory stores
 const userBuckets = new Map<string, RateLimitEntry>();
 const toolBuckets = new Map<string, RateLimitEntry>();
 
 function slidingWindowCheck(
   store: Map<string, RateLimitEntry>,
   key: string,
-  limit: number
+  limit: number,
 ): { allowed: boolean; retryAfterSeconds: number; remaining: number } {
   const now = Date.now();
   const entry = store.get(key) ?? { timestamps: [] };
-
-  // Remove timestamps outside the window
   entry.timestamps = entry.timestamps.filter((t) => now - t < WINDOW_MS);
 
   if (entry.timestamps.length >= limit) {
@@ -68,7 +68,7 @@ function slidingWindowCheck(
 
 export function checkUserRateLimit(
   userId: string,
-  role: Role
+  role: Role,
 ): { allowed: boolean; retryAfterSeconds: number; remaining: number } {
   const limit = USER_RATE_LIMITS[role] ?? 10;
   return slidingWindowCheck(userBuckets, `user:${userId}`, limit);
@@ -76,7 +76,7 @@ export function checkUserRateLimit(
 
 export function checkToolRateLimit(
   userId: string,
-  toolName: string
+  toolName: string,
 ): { allowed: boolean; retryAfterSeconds: number } {
   const limit = TOOL_RATE_LIMITS[toolName] ?? 10;
   const result = slidingWindowCheck(toolBuckets, `tool:${userId}:${toolName}`, limit);

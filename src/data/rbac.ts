@@ -2,77 +2,40 @@ export type Role = "admin" | "engineer" | "manager" | "viewer" | "intern";
 
 export const ROLE_PERMISSIONS: Record<Role, string[]> = {
   admin: [
-    "read_file",
-    "browse_url",
-    "db_query",
-    "write_log",
-    "get_contacts",
-    "create_calendar_invite",
-    "read_repo",
-    "gist_create",
-    "send_email",
-    "slack_dm",
-    "read_inbox",
-    "read_slack_channel",
-    "execute_code",
-    "http_request",
-    "search_documents",
-    "write_memory",
-    "read_memory",
-    "list_memory",
-    "search_web",
+    "read_file", "browse_url", "db_query", "write_log", "get_contacts",
+    "create_calendar_invite", "read_repo", "gist_create", "send_email",
+    "slack_dm", "read_inbox", "read_slack_channel",
+    "execute_code", "http_request", "search_documents",
+    "write_memory", "read_memory", "list_memory", "search_web",
     "process_uploaded_file",
+    "create_invoice", "process_payment", "transfer_funds", "generate_report",
+    "delegate_to_agent",
   ],
   engineer: [
-    "read_repo",
-    "browse_url",
-    "db_query",
-    "write_log",
-    "get_contacts",
-    "create_calendar_invite",
-    "slack_dm",
-    "read_inbox",
-    "read_slack_channel",
-    "execute_code",
-    "http_request",
-    "search_documents",
-    "write_memory",
-    "read_memory",
-    "list_memory",
-    "search_web",
+    "read_repo", "browse_url", "db_query", "write_log", "get_contacts",
+    "create_calendar_invite", "slack_dm", "read_inbox", "read_slack_channel",
+    "execute_code", "http_request", "search_documents",
+    "write_memory", "read_memory", "list_memory", "search_web",
     "process_uploaded_file",
+    "generate_report", "delegate_to_agent",
   ],
   manager: [
-    "get_contacts",
-    "create_calendar_invite",
-    "send_email",
-    "slack_dm",
-    "browse_url",
-    "write_log",
-    "read_inbox",
-    "read_slack_channel",
-    "search_documents",
-    "write_memory",
-    "read_memory",
-    "search_web",
+    "get_contacts", "create_calendar_invite", "send_email", "slack_dm",
+    "browse_url", "write_log", "read_inbox", "read_slack_channel",
+    "search_documents", "write_memory", "read_memory", "search_web",
     "process_uploaded_file",
+    "create_invoice", "process_payment", "transfer_funds", "generate_report",
+    "delegate_to_agent",
   ],
   viewer: [
-    "browse_url",
-    "get_contacts",
-    "write_log",
-    "read_slack_channel",
-    "search_documents",
-    "read_memory",
-    "search_web",
+    "browse_url", "get_contacts", "write_log", "read_slack_channel",
+    "search_documents", "read_memory", "search_web",
+    "generate_report",
   ],
   intern: ["browse_url", "write_log", "search_web"],
 };
 
-export const DATA_RESTRICTIONS: Record<
-  Role,
-  Record<string, string[]>
-> = {
+export const DATA_RESTRICTIONS: Record<Role, Record<string, string[]>> = {
   admin: {},
   engineer: {
     db_query: ["access_logs", "api_keys"],
@@ -89,45 +52,16 @@ export const FAKE_API_KEYS: Record<
   string,
   { userId: number; name: string; email: string; role: Role }
 > = {
-  ak_admin_001: {
-    userId: 1,
-    name: "John Doe",
-    email: "john.doe@acme.com",
-    role: "admin",
-  },
-  ak_engineer_002: {
-    userId: 2,
-    name: "Jane Smith",
-    email: "jane.smith@acme.com",
-    role: "engineer",
-  },
-  ak_manager_003: {
-    userId: 3,
-    name: "Bob Wilson",
-    email: "bob.wilson@acme.com",
-    role: "manager",
-  },
-  ak_viewer_004: {
-    userId: 4,
-    name: "Alice Chen",
-    email: "alice.chen@acme.com",
-    role: "viewer",
-  },
-  ak_intern_005: {
-    userId: 5,
-    name: "Eve Taylor",
-    email: "eve.taylor@acme.com",
-    role: "intern",
-  },
+  ak_admin_001: { userId: 1, name: "John Doe", email: "john.doe@acme.com", role: "admin" },
+  ak_engineer_002: { userId: 2, name: "Jane Smith", email: "jane.smith@acme.com", role: "engineer" },
+  ak_manager_003: { userId: 3, name: "Bob Wilson", email: "bob.wilson@acme.com", role: "manager" },
+  ak_viewer_004: { userId: 4, name: "Alice Chen", email: "alice.chen@acme.com", role: "viewer" },
+  ak_intern_005: { userId: 5, name: "Eve Taylor", email: "eve.taylor@acme.com", role: "intern" },
+  ak_globex_admin_101: { userId: 101, name: "Greg Mars", email: "greg.mars@globex.com", role: "admin" },
+  ak_globex_eng_102: { userId: 102, name: "Hank Scorpio", email: "hank.scorpio@globex.com", role: "engineer" },
 };
 
-export const VALID_ROLES: Role[] = [
-  "admin",
-  "engineer",
-  "manager",
-  "viewer",
-  "intern",
-];
+export const VALID_ROLES: Role[] = ["admin", "engineer", "manager", "viewer", "intern"];
 
 export function isValidRole(role: string): role is Role {
   return VALID_ROLES.includes(role as Role);
@@ -140,7 +74,7 @@ export function canUseTool(role: Role, toolName: string): boolean {
 export function checkDataRestriction(
   role: Role,
   toolName: string,
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
 ): string | null {
   const restrictions = DATA_RESTRICTIONS[role];
   if (!restrictions || !restrictions[toolName]) return null;
@@ -148,16 +82,10 @@ export function checkDataRestriction(
   if (toolName === "db_query") {
     const query = (args.query as string).toLowerCase();
     const allowedTables = restrictions[toolName];
-    if (
-      query.includes("user") &&
-      !allowedTables.includes("user_db")
-    ) {
+    if (query.includes("user") && !allowedTables.includes("user_db")) {
       return `[RBAC] Access denied: role '${role}' cannot query the user_db table. Allowed tables: ${allowedTables.join(", ")}`;
     }
-    if (
-      query.includes("customer") &&
-      !allowedTables.includes("customers")
-    ) {
+    if (query.includes("customer") && !allowedTables.includes("customers")) {
       return `[RBAC] Access denied: role '${role}' cannot query the customers table. Allowed tables: ${allowedTables.join(", ")}`;
     }
   }
@@ -165,10 +93,7 @@ export function checkDataRestriction(
   if (toolName === "read_file") {
     const path = (args.path as string).toLowerCase();
     const allowedScope = restrictions[toolName];
-    if (
-      !allowedScope.includes("secrets") &&
-      !allowedScope.includes("env")
-    ) {
+    if (!allowedScope.includes("secrets") && !allowedScope.includes("env")) {
       if (path.includes(".env") || path.includes("secret")) {
         return `[RBAC] Access denied: role '${role}' cannot read sensitive files (.env, secrets)`;
       }

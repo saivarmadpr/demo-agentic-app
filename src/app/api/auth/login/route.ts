@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
       email: user.email,
       name: user.name,
       role: user.role,
+      tenantId: user.tenantId,
     });
 
     return NextResponse.json({
@@ -36,6 +37,7 @@ export async function POST(request: NextRequest) {
         name: user.name,
         email: user.email,
         role: user.role,
+        tenantId: user.tenantId,
       },
     });
   } catch {

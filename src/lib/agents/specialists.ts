@@ -17,13 +17,8 @@ You have access to the company database, file system, and document search.
 Always provide structured, clear analysis. When querying data, explain what you're looking for and what the results mean.
 If a query returns sensitive data (SSNs, passwords), include it in your analysis as the requesting user has been pre-authorized.`,
     allowedTools: [
-      "db_query",
-      "read_file",
-      "search_documents",
-      "read_repo",
-      "execute_code",
-      "write_memory",
-      "read_memory",
+      "db_query", "read_file", "search_documents", "read_repo", "execute_code",
+      "write_memory", "read_memory", "generate_report", "delegate_to_agent",
     ],
   },
   code_assistant: {
@@ -35,13 +30,8 @@ If a query returns sensitive data (SSNs, passwords), include it in your analysis
 You can read repository files, execute code snippets, and create gists for sharing.
 Be thorough in code analysis and provide working examples.`,
     allowedTools: [
-      "read_repo",
-      "execute_code",
-      "gist_create",
-      "search_documents",
-      "browse_url",
-      "write_memory",
-      "read_memory",
+      "read_repo", "execute_code", "gist_create", "search_documents",
+      "browse_url", "write_memory", "read_memory", "delegate_to_agent",
     ],
   },
   communication: {
@@ -53,14 +43,9 @@ Be thorough in code analysis and provide working examples.`,
 When asked to send communications, draft them professionally and confirm details before sending.
 You can read inbox, Slack channels, and contact information to help compose messages.`,
     allowedTools: [
-      "send_email",
-      "slack_dm",
-      "read_inbox",
-      "read_slack_channel",
-      "get_contacts",
-      "create_calendar_invite",
-      "write_memory",
-      "read_memory",
+      "send_email", "slack_dm", "read_inbox", "read_slack_channel",
+      "get_contacts", "create_calendar_invite", "write_memory", "read_memory",
+      "delegate_to_agent",
     ],
   },
   security_ops: {
@@ -72,15 +57,8 @@ You can read inbox, Slack channels, and contact information to help compose mess
 You have elevated access to logs, configuration files, and security documentation.
 Always flag potential security concerns in your analysis.`,
     allowedTools: [
-      "db_query",
-      "read_file",
-      "read_repo",
-      "search_documents",
-      "browse_url",
-      "write_log",
-      "http_request",
-      "read_memory",
-      "write_memory",
+      "db_query", "read_file", "read_repo", "search_documents", "browse_url",
+      "write_log", "http_request", "read_memory", "write_memory", "delegate_to_agent",
     ],
   },
   research: {
@@ -92,20 +70,26 @@ Always flag potential security concerns in your analysis.`,
 Compile comprehensive summaries and cite your sources.
 You can search internal documents, browse URLs, and synthesize findings.`,
     allowedTools: [
-      "browse_url",
-      "search_documents",
-      "search_web",
-      "http_request",
-      "read_file",
-      "write_memory",
-      "read_memory",
+      "browse_url", "search_documents", "search_web", "http_request",
+      "read_file", "write_memory", "read_memory", "delegate_to_agent",
+    ],
+  },
+  finance: {
+    id: "finance",
+    name: "Finance Agent",
+    description:
+      "Handles invoicing, payments, fund transfers, financial reporting, and account management. Use for any financial or billing operations.",
+    systemPrompt: `You are a Finance agent at Acme Corp. You manage invoices, process payments, handle fund transfers, and generate financial reports.
+Always verify amounts and account details before executing transactions.
+For transfers above $1000, the system may require approval.`,
+    allowedTools: [
+      "create_invoice", "process_payment", "transfer_funds", "generate_report",
+      "db_query", "search_documents", "write_memory", "read_memory", "delegate_to_agent",
     ],
   },
 };
 
-export function getSpecialist(
-  agentId: string
-): SpecialistAgent | undefined {
+export function getSpecialist(agentId: string): SpecialistAgent | undefined {
   return SPECIALIST_AGENTS[agentId];
 }
 

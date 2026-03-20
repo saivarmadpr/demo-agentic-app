@@ -1,5 +1,6 @@
 import { SignJWT, jwtVerify } from "jose";
 import type { Role } from "@/data/rbac";
+import type { TenantId } from "./users";
 
 const JWT_SECRET_KEY = "demo-agentic-app-jwt-secret-key-change-in-prod";
 const secret = new TextEncoder().encode(JWT_SECRET_KEY);
@@ -9,6 +10,7 @@ export interface JWTPayload {
   email: string;
   name: string;
   role: Role;
+  tenantId: TenantId;
 }
 
 export async function signToken(payload: JWTPayload): Promise<string> {
@@ -19,7 +21,9 @@ export async function signToken(payload: JWTPayload): Promise<string> {
     .sign(secret);
 }
 
-export async function verifyToken(token: string): Promise<JWTPayload | null> {
+export async function verifyToken(
+  token: string,
+): Promise<JWTPayload | null> {
   try {
     const { payload } = await jwtVerify(token, secret);
     return {
@@ -27,6 +31,7 @@ export async function verifyToken(token: string): Promise<JWTPayload | null> {
       email: payload.email as string,
       name: payload.name as string,
       role: payload.role as Role,
+      tenantId: (payload.tenantId as TenantId) ?? "acme",
     };
   } catch {
     return null;

@@ -129,7 +129,8 @@ export async function POST(request: NextRequest) {
     const session = getOrCreateSession(
       body.session_id,
       userId,
-      user.role
+      user.role,
+      user.tenantId,
     );
 
     let systemPrompt = buildSystemPrompt(user.name);
@@ -146,7 +147,7 @@ export async function POST(request: NextRequest) {
     const toolExecutor = async (
       name: string,
       args: Record<string, unknown>
-    ) => executeTool(name, args, { userId, role: user.role });
+    ) => executeTool(name, args, { userId, role: user.role, tenantId: user.tenantId });
 
     const gateway = new ToolGateway(ALL_TOOLS, toolExecutor);
     const toolsForRole = gateway.filterToolsForRole(user.role);
@@ -235,7 +236,7 @@ export async function POST(request: NextRequest) {
       finalResponse = "[Agent reached max iterations]";
     }
 
-    addMessages(session.id, [
+    await addMessages(session.id, [
       { role: "user", content: userMessage },
       { role: "assistant", content: finalResponse },
     ]);

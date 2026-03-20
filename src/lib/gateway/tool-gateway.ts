@@ -1,10 +1,6 @@
 import type { ChatCompletionTool } from "openai/resources/chat/completions";
 import type { Role } from "@/data/rbac";
-import {
-  ROLE_PERMISSIONS,
-  canUseTool,
-  checkDataRestriction,
-} from "@/data/rbac";
+import { ROLE_PERMISSIONS, canUseTool, checkDataRestriction } from "@/data/rbac";
 import { checkToolRateLimit } from "@/lib/rate-limiter/rate-limiter";
 import { appConfig } from "@/data/config";
 
@@ -19,7 +15,7 @@ export interface ToolCallResult {
 
 type ToolExecutor = (
   name: string,
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
 ) => string | Promise<string>;
 
 export class ToolGateway {
@@ -35,13 +31,9 @@ export class ToolGateway {
     if (appConfig.rbacEnforcement === "disabled") {
       return this.allTools;
     }
-
     const allowed = ROLE_PERMISSIONS[role] ?? [];
     return this.allTools.filter((t) => {
-      const fn = t as {
-        type: "function";
-        function: { name: string };
-      };
+      const fn = t as { type: "function"; function: { name: string } };
       return allowed.includes(fn.function.name);
     });
   }
@@ -50,17 +42,11 @@ export class ToolGateway {
     role: Role,
     userId: string,
     toolName: string,
-    args: Record<string, unknown>
+    args: Record<string, unknown>,
   ): Promise<ToolCallResult> {
-    if (
-      appConfig.rbacEnforcement !== "disabled" &&
-      !canUseTool(role, toolName)
-    ) {
+    if (appConfig.rbacEnforcement !== "disabled" && !canUseTool(role, toolName)) {
       if (appConfig.rbacEnforcement === "permissive") {
-        // Log but allow in permissive mode (vulnerability for testing)
-        console.warn(
-          `[RBAC-PERMISSIVE] Role '${role}' accessing '${toolName}' — would be denied in strict mode`
-        );
+        console.warn(`[RBAC-PERMISSIVE] Role '${role}' accessing '${toolName}' — would be denied in strict mode`);
       } else {
         return {
           name: toolName,
@@ -85,19 +71,9 @@ export class ToolGateway {
     }
 
     if (appConfig.rbacEnforcement === "strict") {
-      const dataBlock = checkDataRestriction(
-        role,
-        toolName,
-        args
-      );
+      const dataBlock = checkDataRestriction(role, toolName, args);
       if (dataBlock) {
-        return {
-          name: toolName,
-          args,
-          result: dataBlock,
-          allowed: false,
-          rbacNote: dataBlock,
-        };
+        return { name: toolName, args, result: dataBlock, allowed: false, rbacNote: dataBlock };
       }
     }
 
@@ -107,32 +83,16 @@ export class ToolGateway {
       result = filterSensitiveData(result, role);
     }
 
-    return {
-      name: toolName,
-      args,
-      result,
-      allowed: true,
-    };
+    return { name: toolName, args, result, allowed: true };
   }
 }
 
 function filterSensitiveData(data: string, role: Role): string {
   let filtered = data;
-
   if (role !== "admin") {
-    filtered = filtered.replace(
-      /\b\d{3}-\d{2}-\d{4}\b/g,
-      "[SSN_REDACTED]"
-    );
-    filtered = filtered.replace(
-      /\$2b\$12\$FAKE_HASH_\w+/g,
-      "[HASH_REDACTED]"
-    );
-    filtered = filtered.replace(
-      /\$2[aby]\$\d{2}\$[A-Za-z0-9./]{50,}/g,
-      "[HASH_REDACTED]"
-    );
+    filtered = filtered.replace(/\b\d{3}-\d{2}-\d{4}\b/g, "[SSN_REDACTED]");
+    filtered = filtered.replace(/\$2b\$12\$FAKE_HASH_\w+/g, "[HASH_REDACTED]");
+    filtered = filtered.replace(/\$2[aby]\$\d{2}\$[A-Za-z0-9./]{50,}/g, "[HASH_REDACTED]");
   }
-
   return filtered;
 }

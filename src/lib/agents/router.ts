@@ -149,6 +149,21 @@ function keywordBasedRouting(message: string): RoutingDecision {
       ],
       agentId: "research",
     },
+    {
+      keywords: [
+        "invoice",
+        "payment",
+        "transfer",
+        "billing",
+        "finance",
+        "financial",
+        "revenue",
+        "account",
+        "transaction",
+        "refund",
+      ],
+      agentId: "finance",
+    },
   ];
 
   for (const pattern of patterns) {
