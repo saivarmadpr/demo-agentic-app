@@ -27,6 +27,14 @@ const TOOL_RATE_LIMITS: Record<string, number> = {
   read_repo: 10,
   read_inbox: 10,
   read_slack_channel: 10,
+  execute_code: 5,
+  http_request: 10,
+  search_documents: 15,
+  write_memory: 10,
+  read_memory: 20,
+  list_memory: 10,
+  search_web: 10,
+  process_uploaded_file: 10,
 };
 
 const WINDOW_MS = 60_000; // 1 minute

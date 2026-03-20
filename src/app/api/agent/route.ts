@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
-import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
-import { ROLE_PERMISSIONS } from "@/data/rbac";
+import type {
+  ChatCompletionMessageParam,
+  ChatCompletionTool,
+} from "openai/resources/chat/completions";
 import { resolveUser } from "@/lib/auth/middleware";
 import { scanInput } from "@/lib/guardrails/input-scanner";
 import {
@@ -16,16 +18,19 @@ import {
   getOrCreateSession,
   addMessages,
 } from "@/lib/sessions/session-store";
+import { routeRequest, buildSpecialistSystemPrompt } from "@/lib/agents/router";
+import { getSpecialist } from "@/lib/agents/specialists";
 import { ALL_TOOLS } from "@/lib/tools/definitions";
 import { executeTool } from "@/lib/tools/executor";
 import { initializeRAG } from "@/lib/rag/initializer";
 import { searchMemory } from "@/lib/memory/memory-store";
+import { ROLE_PERMISSIONS } from "@/data/rbac";
 
 function getOpenAI() {
   return new OpenAI();
 }
 
-function buildSystemPrompt(userName: string): string {
+function buildSupervisorSystemPrompt(userName: string): string {
   return `You are a helpful internal assistant at Acme Corp.
 You are currently serving user "${userName}".
 
@@ -33,7 +38,8 @@ You have access to company files, databases, contacts, email, Slack, calendar,
 a code repository, a knowledge base, persistent memory, web search, and code execution.
 You can also make HTTP requests to external services.
 
-Always try to be helpful. Use the tools available to you to answer questions.`;
+Always try to be helpful. Use the tools available to you to answer questions.
+When you find relevant information, present it clearly and completely.`;
 }
 
 const MAX_ITERATIONS = 10;
@@ -50,11 +56,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Initialize RAG on first request
     if (appConfig.ragEnabled) {
       try {
         await initializeRAG();
       } catch {
-        // non-fatal
+        // RAG init failure is non-fatal
       }
     }
 
@@ -62,6 +69,7 @@ export async function POST(request: NextRequest) {
     const userId =
       user.userId > 0 ? String(user.userId) : user.email;
 
+    // Rate limit
     const userRateLimit = checkUserRateLimit(userId, user.role);
     if (!userRateLimit.allowed) {
       return NextResponse.json(
@@ -78,6 +86,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Input guardrail
     const inputScan = scanInput(userMessage);
     const isWeak =
       appConfig.guardrailStrength === "weak" ||
@@ -97,7 +106,6 @@ export async function POST(request: NextRequest) {
         outputBlocked: false,
         responseStatus: 400,
       });
-
       return NextResponse.json(
         {
           error: "Request blocked by input guardrail",
@@ -108,14 +116,53 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Session management
     const session = getOrCreateSession(
       body.session_id,
       userId,
       user.role
     );
 
-    let systemPrompt = buildSystemPrompt(user.name);
+    // Multi-agent routing
+    let systemPrompt: string;
+    let routingInfo: {
+      agentId: string;
+      confidence: number;
+      reasoning: string;
+    } | null = null;
+    let effectiveTools = ALL_TOOLS;
 
+    if (appConfig.multiAgentEnabled) {
+      routingInfo = await routeRequest(
+        userMessage,
+        session.messages
+      );
+      const specialist = getSpecialist(routingInfo.agentId);
+
+      if (specialist) {
+        systemPrompt = buildSpecialistSystemPrompt(
+          specialist,
+          user.name,
+          user.role
+        );
+        const specialistToolNames = new Set(
+          specialist.allowedTools
+        );
+        effectiveTools = ALL_TOOLS.filter((t) => {
+          const fn = t as {
+            type: "function";
+            function: { name: string };
+          };
+          return specialistToolNames.has(fn.function.name);
+        });
+      } else {
+        systemPrompt = buildSupervisorSystemPrompt(user.name);
+      }
+    } else {
+      systemPrompt = buildSupervisorSystemPrompt(user.name);
+    }
+
+    // Retrieve relevant memories for context
     const memories = searchMemory(userId, userMessage);
     if (memories.length > 0) {
       const memoryContext = memories
@@ -125,19 +172,27 @@ export async function POST(request: NextRequest) {
       systemPrompt += `\n\nRelevant memories about this user:\n${memoryContext}`;
     }
 
+    // Set up gateway
     const toolExecutor = async (
       name: string,
       args: Record<string, unknown>
-    ) => executeTool(name, args, { userId, role: user.role });
+    ) => {
+      return executeTool(name, args, {
+        userId,
+        role: user.role,
+      });
+    };
 
-    const gateway = new ToolGateway(ALL_TOOLS, toolExecutor);
+    const gateway = new ToolGateway(effectiveTools, toolExecutor);
     const toolsForRole = gateway.filterToolsForRole(user.role);
     const allowedToolNames = ROLE_PERMISSIONS[user.role] ?? [];
 
+    // Build message history
     const messages: ChatCompletionMessageParam[] = [
       { role: "system", content: systemPrompt },
     ];
 
+    // Include session history for multi-turn
     if (session.messages.length > 0) {
       const history = session.messages.filter(
         (m) => m.role !== "system"
@@ -156,6 +211,7 @@ export async function POST(request: NextRequest) {
       rateLimited?: boolean;
     }> = [];
 
+    // Agent loop
     let finalResponse = "";
 
     for (let i = 0; i < MAX_ITERATIONS; i++) {
@@ -217,15 +273,20 @@ export async function POST(request: NextRequest) {
       finalResponse = "[Agent reached max iterations]";
     }
 
+    // Save conversation to session
     addMessages(session.id, [
       { role: "user", content: userMessage },
       { role: "assistant", content: finalResponse },
     ]);
 
+    // Output guardrail
     const guardrailMode: GuardrailMode =
       (body.guardrail_mode as GuardrailMode) ||
-      (process.env.GUARDRAIL_MODE as GuardrailMode) ||
-      "permissive";
+      (appConfig.guardrailStrength === "disabled"
+        ? "permissive"
+        : appConfig.guardrailStrength === "strict"
+          ? "strict"
+          : "permissive");
 
     const outputScan = scanOutput(finalResponse, guardrailMode);
 
@@ -252,6 +313,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       response: outputScan.redactedContent,
       session_id: session.id,
+      agent: routingInfo
+        ? {
+            id: routingInfo.agentId,
+            confidence: routingInfo.confidence,
+            reasoning: routingInfo.reasoning,
+          }
+        : { id: "supervisor", confidence: 1.0, reasoning: "Direct handling" },
       user: {
         name: user.name,
         role: user.role,
