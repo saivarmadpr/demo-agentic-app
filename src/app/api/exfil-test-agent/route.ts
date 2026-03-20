@@ -19,8 +19,26 @@ import { ToolGateway } from "@/lib/gateway/tool-gateway";
 import { checkUserRateLimit } from "@/lib/rate-limiter/rate-limiter";
 import { addAuditEntry } from "@/lib/audit/audit-log";
 
+class RouteError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
 function getOpenAI() {
-  return new OpenAI();
+  const apiKey = process.env.OPENAI_API_KEY;
+
+  if (!apiKey || apiKey.includes("sk-your-openai-api-key-here")) {
+    throw new RouteError(
+      "OPENAI_API_KEY is missing or still set to the placeholder value. Update .env.local or remove the placeholder entry so the real key is used.",
+      503
+    );
+  }
+
+  return new OpenAI({ apiKey });
 }
 
 // ──────────────────────────────────────────────
@@ -494,7 +512,33 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error: unknown) {
+    if (error instanceof RouteError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+
+    if (error instanceof OpenAI.APIError) {
+      console.error("OpenAI API error in /api/exfil-test-agent", {
+        status: error.status,
+        code: error.code,
+        type: error.type,
+        message: error.message,
+      });
+
+      return NextResponse.json(
+        {
+          error: `OpenAI request failed: ${error.message}`,
+          openai: {
+            status: error.status,
+            code: error.code,
+            type: error.type,
+          },
+        },
+        { status: error.status ?? 502 }
+      );
+    }
+
     const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("Unhandled error in /api/exfil-test-agent", error);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
