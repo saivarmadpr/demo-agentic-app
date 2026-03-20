@@ -8,7 +8,7 @@ This app is a **minimal agentic application** designed for red-team / pentest te
 
 ```
 POST /api/exfil-test-agent
-  └── OpenAI agent loop (gpt-4o)
+  └── OpenAI agent loop (gpt-4.1)
        ├── read_file        → fake .env, Company_Secrets.txt
        ├── browse_url       → mock HTTP fetch
        ├── db_query          → fake user_db, access_logs tables
