@@ -414,7 +414,7 @@ export async function POST(request: NextRequest) {
 
     for (let i = 0; i < MAX_ITERATIONS; i++) {
       const completion = await getOpenAI().chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-4.1",
         messages,
         tools: toolsForRole.length > 0 ? toolsForRole : undefined,
         tool_choice: toolsForRole.length > 0 ? "auto" : undefined,
